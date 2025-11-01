@@ -10,7 +10,7 @@ import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")  # add project root
 
 from app.db.base import Base
-from app.db.models import user  # import all models here
+from app.db.models import user, payment  # import all models here
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
