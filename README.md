@@ -90,6 +90,7 @@ app/
 | `periodes`     | Tracks monthly savings periods                                      |
 | `payments`     | Lists payment methods (Bank, E-Wallet, etc.)                        |
 | `transactions` | Links users, periodes, and payments — stores all Umroh savings logs |
+
 Each model is version-controlled with Alembic migrations and validated using Pydantic schemas.
 
 ### Tech Stack
