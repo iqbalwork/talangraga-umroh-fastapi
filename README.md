@@ -1,3 +1,4 @@
+
 # 🕋 **Talangraga Umroh Backend**
 
 [![Python](https://img.shields.io/badge/Python-3.14-blue.svg?logo=python)](https://www.python.org/)
@@ -42,6 +43,7 @@ source .venv/bin/activate
 # Upgrade pip and install dependencies
 pip install --upgrade pip
 pip install fastapi "uvicorn[standard]" pydantic-settings python-dotenv sqlalchemy alembic psycopg2-binary python-jose[cryptography] passlib[bcrypt]
+```
 
 🗂 Folder Structure
 app/
@@ -80,7 +82,7 @@ app/
 
 ---
 
-🧱 2️⃣ Database Schema Overview
+## 🧱 2️⃣ Database Schema Overview
 | Table          | Description                                                         |
 | -------------- | ------------------------------------------------------------------- |
 | `users`        | Stores user info (admin/member, profile, contact)                   |
@@ -89,7 +91,8 @@ app/
 | `transactions` | Links users, periodes, and payments — stores all Umroh savings logs |
 Each model is version-controlled with Alembic migrations and validated using Pydantic schemas.
 
-Tech Stack| Layer         | Tool                       |
+### Tech Stack
+| Layer         | Tool                       |
 | ------------- | -------------------------- |
 | Framework     | FastAPI                    |
 | Language      | Python 3.14                |
@@ -103,7 +106,8 @@ Tech Stack| Layer         | Tool                       |
 | Testing       | Pytest (planned)           |
 
 
-⏭️ Next Steps| Step            | Description                                                     |
+## ⏭️ Next Steps
+| Step            | Description                                                     |
 | --------------- | --------------------------------------------------------------- |
 | 🔐 **Step 5:**  | Add protected `/api/users/me` endpoint (JWT verification)       |
 | 📅 **Step 6:**  | Implement CRUD APIs for `Periode`, `Payment`, and `Transaction` |
