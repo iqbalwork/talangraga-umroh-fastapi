@@ -4,11 +4,11 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-Framework-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue?logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Progress-Stage_3B-success.svg)]()
+[![Status](https://img.shields.io/badge/Progress-Stage_4-success.svg)]()
 
 Backend service for **Talangraga Umroh**, built with **FastAPI + PostgreSQL + Alembic**.  
-This backend manages users, authentication, and Umroh savings transactions.  
-Designed to power the **Talangraga Umroh Mobile App** (Compose Multiplatform).
+This backend manages users, periodes, payments, and Umroh savings transactions —  
+designed to power the **Talangraga Umroh Mobile App** (Compose Multiplatform).
 
 ---
 
@@ -20,9 +20,11 @@ Designed to power the **Talangraga Umroh Mobile App** (Compose Multiplatform).
 | ✅ 2 | FastAPI Base Project Scaffold (routes, config, CORS) | Completed |
 | ✅ 3A | Database & Auth Setup (SQLAlchemy + JWT Auth) | Completed |
 | ✅ 3B | Alembic Migration Setup + First Migration | Completed |
-| ⏭️ 4 | Protected `/users/me` Route (JWT Token Auth) | Next |
-| 🚧 5 | Dockerize FastAPI + Environment Config | Upcoming |
-| 🚧 6 | Deploy to Railway/VPS or Docker Compose Stack | Upcoming |
+| ✅ 4 | Core Tables: `User`, `Periode`, `Payment`, `Transaction` | Completed |
+| ⏭️ 5 | Protected `/users/me` Route (JWT Token Auth) | Next |
+| 🚧 6 | CRUD APIs for Periode, Payment, Transaction | Upcoming |
+| 🚧 7 | Dockerize FastAPI + Environment Config | Upcoming |
+| 🚧 8 | Deploy to Railway/VPS or Docker Compose Stack | Upcoming |
 
 ---
 
@@ -41,6 +43,7 @@ source .venv/bin/activate
 pip install --upgrade pip
 pip install fastapi "uvicorn[standard]" pydantic-settings python-dotenv sqlalchemy alembic psycopg2-binary python-jose[cryptography] passlib[bcrypt]
 
+🗂 Folder Structure
 app/
 ├── main.py
 ├── __init__.py
@@ -63,16 +66,30 @@ app/
 │   ├── session.py
 │   └── models/
 │       ├── __init__.py
-│       └── user.py
+│       ├── user.py
+│       ├── periode.py
+│       ├── payment.py
+│       └── transaction.py
 │
 └── schemas/
     ├── __init__.py
-    └── user.py
+    ├── user.py
+    ├── periode.py
+    ├── payment.py
+    └── transaction.py
 
 ---
 
-Tech Stack
-| Layer         | Tool                       |
+🧱 2️⃣ Database Schema Overview
+| Table          | Description                                                         |
+| -------------- | ------------------------------------------------------------------- |
+| `users`        | Stores user info (admin/member, profile, contact)                   |
+| `periodes`     | Tracks monthly savings periods                                      |
+| `payments`     | Lists payment methods (Bank, E-Wallet, etc.)                        |
+| `transactions` | Links users, periodes, and payments — stores all Umroh savings logs |
+Each model is version-controlled with Alembic migrations and validated using Pydantic schemas.
+
+Tech Stack| Layer         | Tool                       |
 | ------------- | -------------------------- |
 | Framework     | FastAPI                    |
 | Language      | Python 3.14                |
@@ -83,14 +100,18 @@ Tech Stack
 | Password Hash | passlib[bcrypt]            |
 | Config        | pydantic-settings + dotenv |
 | Dev Server    | Uvicorn                    |
+| Testing       | Pytest (planned)           |
 
-Next Step
-| Step           | Description                                                      |
-| -------------- | ---------------------------------------------------------------- |
-| 🔐 **Step 4:** | Add protected `/api/users/me` endpoint (JWT token verification)  |
-| 🐳 **Step 5:** | Dockerize backend (FastAPI + Alembic + PostgreSQL unified stack) |
-| ☁️ **Step 6:** | Deploy to Railway, Render, or VPS                                |
-| 🧰 **Step 7:** | Add unit tests using Pytest + SQLite test DB                     |
+
+⏭️ Next Steps| Step            | Description                                                     |
+| --------------- | --------------------------------------------------------------- |
+| 🔐 **Step 5:**  | Add protected `/api/users/me` endpoint (JWT verification)       |
+| 📅 **Step 6:**  | Implement CRUD APIs for `Periode`, `Payment`, and `Transaction` |
+| 🐳 **Step 7:**  | Dockerize backend (FastAPI + Alembic + PostgreSQL stack)        |
+| ☁️ **Step 8:**  | Deploy to Railway / Render / VPS                                |
+| 🧪 **Step 9:**  | Add unit tests using Pytest + SQLite test DB                    |
+| 📘 **Step 10:** | Generate API Docs (Swagger/OpenAPI auto)                        |
+
 
 ✨ Author
 
