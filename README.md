@@ -46,7 +46,7 @@ pip install fastapi "uvicorn[standard]" pydantic-settings python-dotenv sqlalche
 ```
 
 🗂 Folder Structure
-
+```bash
 app/
 ├── main.py
 ├── __init__.py
@@ -80,8 +80,7 @@ app/
     ├── periode.py
     ├── payment.py
     └── transaction.py
-
-
+```
 ---
 
 ## 🧱 2️⃣ Database Schema Overview
