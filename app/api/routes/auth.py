@@ -33,6 +33,10 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 # ----------------------------------------------------------
 security = HTTPBearer()
 
+# ----------------------------------------------------------
+# In-memory blacklist for refresh tokens (temporary)
+# ----------------------------------------------------------
+BLACKLISTED_REFRESH_TOKENS: set[str] = set()
 
 # ----------------------------------------------------------
 # Helper: Get current user from Access Token
@@ -42,14 +46,25 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     token = credentials.credentials
-
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+        exp: int = payload.get("exp")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        if exp is not None and datetime.utcfromtimestamp(exp) < datetime.utcnow():
+            raise HTTPException(
+                status_code=401,
+                detail="Access token expired, please refresh your token",
+            )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Access token expired, please refresh your token",
+        )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or malformed token")
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -141,6 +156,10 @@ def login_user(request: UserLogin, db: Session = Depends(get_db)):
 def refresh_access_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     refresh_token = credentials.credentials
 
+    # ✅ Check blacklist
+    if refresh_token in BLACKLISTED_REFRESH_TOKENS:
+        raise HTTPException(status_code=401, detail="Refresh token has been invalidated")
+
     try:
         payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
@@ -149,17 +168,13 @@ def refresh_access_token(credentials: HTTPAuthorizationCredentials = Depends(sec
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    # Create new short-lived access token
     new_access_token = create_access_token({"sub": email})
+
     return BaseResponse(
         code=200,
         message="Access token refreshed successfully",
-        data={
-            "access_token": new_access_token,
-            "token_type": "bearer",
-        },
+        data={"access_token": new_access_token, "token_type": "bearer"},
     )
-
 
 # ----------------------------------------------------------
 # FORGOT PASSWORD
@@ -205,3 +220,28 @@ def delete_user(
     db.commit()
 
     return BaseResponse(code=200, message="User deleted successfully", data=None)
+
+
+# ----------------------------------------------------------
+# LOGOUT - Invalidate Refresh Token
+# ----------------------------------------------------------
+@router.post("/logout", response_model=BaseResponse)
+def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    refresh_token = credentials.credentials
+
+    try:
+        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # ✅ Add token to blacklist
+    BLACKLISTED_REFRESH_TOKENS.add(refresh_token)
+
+    return BaseResponse(
+        code=200,
+        message="User logged out successfully. Refresh token invalidated.",
+        data=None,
+    )
