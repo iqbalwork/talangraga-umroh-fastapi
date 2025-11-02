@@ -148,6 +148,45 @@ def login_user(request: UserLogin, db: Session = Depends(get_db)):
         },
     )
 
+# ----------------------------------------------------------
+# LOGOUT - Invalidate Refresh Token
+# ----------------------------------------------------------
+@router.post("/logout", response_model=BaseResponse)
+def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    refresh_token = credentials.credentials
+
+    try:
+        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # ✅ Add token to blacklist
+    BLACKLISTED_REFRESH_TOKENS.add(refresh_token)
+
+    return BaseResponse(
+        code=200,
+        message="User logged out successfully. Refresh token invalidated.",
+        data=None,
+    )
+
+# ----------------------------------------------------------
+# FORGOT PASSWORD
+# ----------------------------------------------------------
+@router.post("/forgot-password", response_model=BaseResponse)
+def forgot_password(request: UserForgotPassword, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+    reset_token = create_access_token({"sub": user.email})
+    return BaseResponse(
+        code=200,
+        message="Password reset link sent (simulated)",
+        data={"reset_token": reset_token},
+    )
 
 # ----------------------------------------------------------
 # REFRESH ACCESS TOKEN using Refresh Token
@@ -177,23 +216,6 @@ def refresh_access_token(credentials: HTTPAuthorizationCredentials = Depends(sec
     )
 
 # ----------------------------------------------------------
-# FORGOT PASSWORD
-# ----------------------------------------------------------
-@router.post("/forgot-password", response_model=BaseResponse)
-def forgot_password(request: UserForgotPassword, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == request.email).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Email not found")
-
-    reset_token = create_access_token({"sub": user.email})
-    return BaseResponse(
-        code=200,
-        message="Password reset link sent (simulated)",
-        data={"reset_token": reset_token},
-    )
-
-
-# ----------------------------------------------------------
 # DELETE USER (Admin only)
 # ----------------------------------------------------------
 @router.delete("/delete/{user_id}", response_model=BaseResponse)
@@ -220,28 +242,3 @@ def delete_user(
     db.commit()
 
     return BaseResponse(code=200, message="User deleted successfully", data=None)
-
-
-# ----------------------------------------------------------
-# LOGOUT - Invalidate Refresh Token
-# ----------------------------------------------------------
-@router.post("/logout", response_model=BaseResponse)
-def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    refresh_token = credentials.credentials
-
-    try:
-        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload.get("sub")
-        if email is None:
-            raise HTTPException(status_code=401, detail="Invalid refresh token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
-
-    # ✅ Add token to blacklist
-    BLACKLISTED_REFRESH_TOKENS.add(refresh_token)
-
-    return BaseResponse(
-        code=200,
-        message="User logged out successfully. Refresh token invalidated.",
-        data=None,
-    )
