@@ -131,7 +131,7 @@ def login_user(request: UserLogin, db: Session = Depends(get_db)):
     )
 
     if not user or not verify_password(request.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="email, username, nomor HP, atau password salah")
 
     # Create access and refresh tokens
     access_token = create_access_token({"sub": user.email})
