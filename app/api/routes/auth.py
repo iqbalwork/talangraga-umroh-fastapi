@@ -19,39 +19,69 @@ from app.core.security import (
     hash_password,
     verify_password,
     create_access_token,
+    create_refresh_token,   # ✅ new
     SECRET_KEY,
+    REFRESH_SECRET_KEY,     # ✅ new (add this to your security.py)
     ALGORITHM,
 )
+from datetime import datetime
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # ----------------------------------------------------------
-# HTTP Bearer authentication (simpler, JWT-based)
+# HTTP Bearer authentication
 # ----------------------------------------------------------
 security = HTTPBearer()
 
+# ----------------------------------------------------------
+# In-memory blacklist for refresh tokens (temporary)
+# ----------------------------------------------------------
+BLACKLISTED_REFRESH_TOKENS: set[str] = set()
 
 # ----------------------------------------------------------
-# Helper: get current user from token
+# Helper: Get current user from Access Token
 # ----------------------------------------------------------
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ) -> User:
-    token = credentials.credentials  # ✅ Extract token string here
-
+    token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
+        exp: int = payload.get("exp")
         if email is None:
             raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        if exp is not None and datetime.utcfromtimestamp(exp) < datetime.utcnow():
+            raise HTTPException(
+                status_code=401,
+                detail="Access token expired, please refresh your token",
+            )
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=401,
+            detail="Access token expired, please refresh your token",
+        )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        raise HTTPException(status_code=401, detail="Invalid or malformed token")
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+# ----------------------------------------------------------
+# GET USER PROFILE
+# ----------------------------------------------------------
+@router.get("/profile", response_model=BaseResponse)
+def get_user_profile(current_user: User = Depends(get_current_user)):
+    return BaseResponse(
+        code=200,
+        message="User profile fetched successfully",
+        data=UserResponse.from_orm(current_user),
+    )
 
 
 # ----------------------------------------------------------
@@ -61,7 +91,6 @@ def get_current_user(
 def register_user(request: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == request.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-
     if db.query(User).filter(User.username == request.username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
 
@@ -87,25 +116,61 @@ def register_user(request: UserCreate, db: Session = Depends(get_db)):
 
 
 # ----------------------------------------------------------
-# LOGIN
+# LOGIN (email/username/phone) + issue tokens
 # ----------------------------------------------------------
 @router.post("/login", response_model=BaseResponse)
 def login_user(request: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == request.email).first()
+    user = (
+        db.query(User)
+        .filter(
+            (User.email == request.identifier)
+            | (User.username == request.identifier)
+            | (User.phone_number == request.identifier)
+        )
+        .first()
+    )
 
     if not user or not verify_password(request.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="email, username, nomor HP, atau password salah")
 
-    access_token = create_access_token(
-        {"sub": user.email}, expires_delta=timedelta(days=1)
-    )
+    # Create access and refresh tokens
+    access_token = create_access_token({"sub": user.email})
+    refresh_token = create_refresh_token({"sub": user.email})
 
     return BaseResponse(
         code=200,
         message="Login successful",
-        data={"token": access_token, "user": UserResponse.from_orm(user)},
+        data={
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": UserResponse.from_orm(user),
+        },
     )
 
+# ----------------------------------------------------------
+# LOGOUT - Invalidate Refresh Token
+# ----------------------------------------------------------
+@router.post("/logout", response_model=BaseResponse)
+def logout_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    refresh_token = credentials.credentials
+
+    try:
+        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        email = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # ✅ Add token to blacklist
+    BLACKLISTED_REFRESH_TOKENS.add(refresh_token)
+
+    return BaseResponse(
+        code=200,
+        message="User logged out successfully. Refresh token invalidated.",
+        data=None,
+    )
 
 # ----------------------------------------------------------
 # FORGOT PASSWORD
@@ -113,7 +178,6 @@ def login_user(request: UserLogin, db: Session = Depends(get_db)):
 @router.post("/forgot-password", response_model=BaseResponse)
 def forgot_password(request: UserForgotPassword, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == request.email).first()
-
     if not user:
         raise HTTPException(status_code=404, detail="Email not found")
 
@@ -124,6 +188,32 @@ def forgot_password(request: UserForgotPassword, db: Session = Depends(get_db)):
         data={"reset_token": reset_token},
     )
 
+# ----------------------------------------------------------
+# REFRESH ACCESS TOKEN using Refresh Token
+# ----------------------------------------------------------
+@router.post("/refresh", response_model=BaseResponse)
+def refresh_access_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    refresh_token = credentials.credentials
+
+    # ✅ Check blacklist
+    if refresh_token in BLACKLISTED_REFRESH_TOKENS:
+        raise HTTPException(status_code=401, detail="Refresh token has been invalidated")
+
+    try:
+        payload = jwt.decode(refresh_token, REFRESH_SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    new_access_token = create_access_token({"sub": email})
+
+    return BaseResponse(
+        code=200,
+        message="Access token refreshed successfully",
+        data={"access_token": new_access_token, "token_type": "bearer"},
+    )
 
 # ----------------------------------------------------------
 # DELETE USER (Admin only)
@@ -134,18 +224,15 @@ def delete_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # ✅ Check role
     if current_user.user_type != "admin":
         raise HTTPException(
             status_code=403, detail="Only admin users can delete other users"
         )
 
     user_to_delete = db.query(User).filter(User.id == user_id).first()
-
     if not user_to_delete:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Prevent admin from deleting themselves (optional)
     if user_to_delete.id == current_user.id:
         raise HTTPException(
             status_code=400, detail="Admin cannot delete their own account"
