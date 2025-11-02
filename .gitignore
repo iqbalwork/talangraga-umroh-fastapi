@@ -1,0 +1,84 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+*.tmp
+*.log
+*.pot
+*.pyc
+*.pkl
+*.so
+
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+pip-wheel-metadata/
+*.egg-info/
+.eggs/
+*.egg
+dist/
+build/
+
+# Byte-compiled / cache / test
+.coverage
+.tox/
+.pytest_cache/
+.cache/
+*.cover
+*.py,cover
+.hypothesis/
+
+# Environment / Secrets
+.env
+.env.*
+*.secret
+*.key
+*.pem
+secret.properties
+
+# Alembic / Migrations
+alembic/versions/__pycache__/
+alembic/versions/*.pyc
+alembic/versions/*.pyo
+
+# SQLite / Database (if any local test DB)
+*.db
+*.sqlite3
+
+# Editor / IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS / System files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs / Reports
+logs/
+*.log
+*.out
+*.err
+
+# Coverage / Reports
+htmlcov/
+coverage.xml
+
+# Docker
+*.pid
+*.tar
+docker-compose.override.yml
+
+# PyInstaller
+*.spec
+
+# Local cache / tmp
+tmp/
+*.bak
+*.old
