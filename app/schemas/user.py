@@ -1,28 +1,36 @@
+# app/schemas/user.py
 from pydantic import BaseModel, EmailStr
-from enum import Enum
 from typing import Optional
 
-class UserType(str, Enum):
-    admin = "admin"
-    member = "member"
-
+# Base user schema
 class UserBase(BaseModel):
     fullname: str
     username: str
     email: EmailStr
     phone_number: Optional[str] = None
-    is_active: bool = True
     domisili: Optional[str] = None
-    user_type: UserType = UserType.member
+    user_type: Optional[str] = "member"
     image_profile_url: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
 
-class UserOut(UserBase):
+class UserLogin(BaseModel):
+    identifier: str
+    password: str
+
+class UserForgotPassword(BaseModel):
+    email: EmailStr
+
+class UserResponse(UserBase):
     id: int
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    is_active: bool
 
     class Config:
-        from_attributes = True
+        from_attributes = True   # ✅ new syntax for Pydantic v2
+
+# Wrapper for API response
+class BaseResponse(BaseModel):
+    code: int
+    message: str
+    data: Optional[object] = None
