@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
 
 class PeriodeBase(BaseModel):
     periode_name: str
@@ -11,7 +11,7 @@ class PeriodeCreate(PeriodeBase):
 
 class PeriodeOut(PeriodeBase):
     id: int
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True
