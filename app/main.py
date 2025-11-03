@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes.health import router as health_router
-from app.api.routes import auth  # import the new router
+from app.api.routes import auth, periode  # import the new router
 from app.db.base import Base
 from app.db.session import engine
 from fastapi.openapi.utils import get_openapi
@@ -21,6 +21,7 @@ app.add_middleware(
 
 app.include_router(health_router, prefix=settings.API_PREFIX)
 app.include_router(auth.router)
+app.include_router(periode.router)
 
 @app.get("/")
 def root():
