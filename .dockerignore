@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+.env
+.env.*
+.git
+.gitignore
+.vscode
+.idea
+alembic.ini
+migrations/
+dist/
+build/

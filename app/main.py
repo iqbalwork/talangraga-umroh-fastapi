@@ -2,14 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.routes.health import router as health_router
-from app.api.routes import auth  # import the new router
+from app.api.routes import auth, periode, payment, transaction, user  # import the new router
 from app.db.base import Base
 from app.db.session import engine
 from fastapi.openapi.utils import get_openapi
+from app.core.exception_handler import init_exception_handlers
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.APP_NAME)
+
+# ✅ Register global exception handlers
+init_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,6 +25,10 @@ app.add_middleware(
 
 app.include_router(health_router, prefix=settings.API_PREFIX)
 app.include_router(auth.router)
+app.include_router(periode.router)
+app.include_router(payment.router)
+app.include_router(transaction.router)
+app.include_router(user.router)
 
 @app.get("/")
 def root():
