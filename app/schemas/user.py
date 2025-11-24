@@ -22,6 +22,19 @@ class UserLogin(BaseModel):
 class UserForgotPassword(BaseModel):
     email: EmailStr
 
+class UserUpdate(BaseModel):
+    fullname: Optional[str] = None
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    domisili: Optional[str] = None
+    user_type: Optional[str] = None
+    password: Optional[str] = None
+    image_profile_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
 class UserResponse(UserBase):
     id: int
     is_active: bool
