@@ -19,6 +19,7 @@ argon2-cffi
 
 # File upload / multipart
 python-multipart==0.0.20
+cloudinary
 
 # Networking
 httpx==0.28.1

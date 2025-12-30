@@ -1,5 +1,5 @@
 # app/api/routes/user.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from typing import List
 from typing import Optional
@@ -8,6 +8,8 @@ from app.db.session import get_db
 from app.db.models.user import User
 from app.schemas.user import UserResponse, BaseResponse, UserUpdate
 from app.api.routes.auth import get_current_user
+from app.core.security import hash_password
+from app.utils.cloudinary import upload_image
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -108,31 +110,28 @@ def update_user(
 # 🟢 UPDATE OWN PROFILE
 @router.put("/me/update", response_model=BaseResponse)
 def update_own_profile(
-    request: UserUpdate,
+    fullname: Optional[str] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    image_profile: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Restrict update of sensitive fields
-    forbidden_fields = ["user_type", "email", "username"]
-    for field in forbidden_fields:
-        if getattr(request, field):
-            raise HTTPException(
-                status_code=400,
-                detail=f"You are not allowed to update '{field}'"
-            )
+    user = current_user
 
-    user = current_user  # direct reference
-
-    if request.fullname:
-        user.fullname = request.fullname
-    if request.phone_number:
-        user.phone_number = request.phone_number
-    if request.domisili:
-        user.domisili = request.domisili
-    if request.image_profile_url:
-        user.image_profile_url = request.image_profile_url
-    if request.password:
-        user.password = hash_password(request.password)
+    if fullname:
+        user.fullname = fullname
+    if phone_number:
+        user.phone_number = phone_number
+    if domisili:
+        user.domisili = domisili
+    if password:
+        user.password = hash_password(password)
+    
+    if image_profile:
+        image_url = upload_image(image_profile)
+        user.image_profile_url = image_url
 
     db.commit()
     db.refresh(user)
