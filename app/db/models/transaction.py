@@ -23,6 +23,7 @@ class Transaction(Base):
     status = Column(Enum(TransactionStatus), default=TransactionStatus.sent, nullable=False)
     bukti_transfer_url = Column(Text, nullable=True)
 
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     reported_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     confirmed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     periode_id = Column(Integer, ForeignKey("periodes.id"), nullable=True)
@@ -33,6 +34,7 @@ class Transaction(Base):
     updated_at = Column(TIMESTAMP(timezone=True), onupdate=func.now())
 
     # ✅ Relationships
+    user = relationship("User", foreign_keys=[user_id])
     reported_by = relationship("User", foreign_keys=[reported_by_id])
     confirmed_by = relationship("User", foreign_keys=[confirmed_by_id])
     payment = relationship("Payment", lazy="joined")   # ✅ this one must exist

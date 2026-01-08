@@ -16,6 +16,8 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 # 🟢 CREATE Transaction
 @router.post("/", response_model=BaseResponse)
 def create_transaction(
+    userId: int = Form(...),
+    reportedByUserId: Optional[int] = Form(None),
     amount: float = Form(...),
     transaction_date: datetime = Form(...),
     periode_id: Optional[int] = Form(None),
@@ -33,7 +35,8 @@ def create_transaction(
         bukti_transfer_url=image_url,
         periode_id=periode_id,
         payment_id=payment_id,
-        reported_by_id=current_user.id,
+        reported_by_id=reportedByUserId or current_user.id,
+        user_id=userId,
     )
     db.add(new_transaction)
     db.commit()

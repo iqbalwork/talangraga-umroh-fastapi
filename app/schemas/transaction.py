@@ -44,6 +44,7 @@ class TransactionUpdateStatus(BaseModel):
 # 🔵 Response model with nested relations
 class TransactionOut(TransactionBase):
     id: int
+    user_id: int
     status: TransactionStatus
     reported_date: datetime
     created_at: datetime
@@ -51,6 +52,7 @@ class TransactionOut(TransactionBase):
 
     reported_by: Optional[SimpleUser] = None
     confirmed_by: Optional[SimpleUser] = None
+    user: Optional[SimpleUser] = None
     payment: Optional[PaymentOut] = None
     periode: Optional[PeriodeOut] = None
 
