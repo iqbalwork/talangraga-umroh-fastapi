@@ -1,7 +1,7 @@
 # app/api/routes/auth.py
 from datetime import timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models.user import User
 from app.schemas.user import (
-    UserCreate,
     UserLogin,
     UserForgotPassword,
     UserResponse,
@@ -87,22 +86,40 @@ def get_user_profile(current_user: User = Depends(get_current_user)):
 # ----------------------------------------------------------
 # REGISTER
 # ----------------------------------------------------------
+# ----------------------------------------------------------
+# REGISTER
+# ----------------------------------------------------------
 @router.post("/register", response_model=BaseResponse)
-def register_user(request: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == request.email).first():
+def register_user(
+    fullname: str = Form(...),
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    user_type: Optional[str] = Form("member"),
+    image_profile: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    if db.query(User).filter(User.username == request.username).first():
+    if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    image_profile_url = ""
+    if image_profile:
+        from app.utils.cloudinary import upload_image  # local import to avoid circular dependency if any, though top level is fine too
+        image_profile_url = upload_image(image_profile)
+
     new_user = User(
-        fullname=request.fullname,
-        username=request.username,
-        email=request.email,
-        password=hash_password(request.password),
-        phone_number=request.phone_number,
-        domisili=request.domisili,
-        user_type=request.user_type,
-        image_profile_url=request.image_profile_url,
+        fullname=fullname,
+        username=username,
+        email=email,
+        password=hash_password(password),
+        phone_number=phone_number,
+        domisili=domisili,
+        user_type=user_type,
+        image_profile_url=image_profile_url,
     )
     db.add(new_user)
     db.commit()

@@ -79,6 +79,7 @@ def get_all_transactions(
     periode_id: Optional[int] = Query(None),
     status: Optional[TransactionStatus] = Query(None),
     payment_id: Optional[int] = Query(None),
+    user_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -94,6 +95,9 @@ def get_all_transactions(
 
     if current_user.user_type != "admin":
         query = query.filter(Transaction.reported_by_id == current_user.id)
+    elif user_id is not None:
+        # If admin AND user_id is provided, filter by that user
+        query = query.filter(Transaction.reported_by_id == user_id)
 
     if periode_id is not None:
         query = query.filter(Transaction.periode_id == periode_id)
