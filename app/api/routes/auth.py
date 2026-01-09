@@ -11,6 +11,7 @@ from app.db.models.user import User
 from app.schemas.user import (
     UserLogin,
     UserForgotPassword,
+    UserResetPassword,
     UserResponse,
     BaseResponse,
 )
@@ -201,8 +202,33 @@ def forgot_password(request: UserForgotPassword, db: Session = Depends(get_db)):
     reset_token = create_access_token({"sub": user.email})
     return BaseResponse(
         code=200,
-        message="Password reset link sent (simulated)",
         data={"reset_token": reset_token},
+    )
+
+# ----------------------------------------------------------
+# RESET PASSWORD
+# ----------------------------------------------------------
+@router.post("/reset-password", response_model=BaseResponse)
+def reset_password(request: UserResetPassword, db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(request.reset_token, SECRET_KEY, algorithms=[ALGORITHM])
+        email: str = payload.get("sub")
+        if email is None:
+            raise HTTPException(status_code=400, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = hash_password(request.new_password)
+    db.commit()
+
+    return BaseResponse(
+        code=200,
+        message="Password has been reset successfully",
+        data=None,
     )
 
 # ----------------------------------------------------------

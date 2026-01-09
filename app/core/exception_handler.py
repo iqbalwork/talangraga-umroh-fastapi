@@ -2,6 +2,7 @@
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 def init_exception_handlers(app):
@@ -12,7 +13,7 @@ def init_exception_handlers(app):
             status_code=exc.status_code,
             content={
                 "code": exc.status_code,
-                "message": exc.detail or "An error occurred",
+                "message": str(exc.detail) if exc.detail else "An error occurred",
                 "data": None
             },
         )
@@ -25,7 +26,7 @@ def init_exception_handlers(app):
             content={
                 "code": 422,
                 "message": "Validation error",
-                "data": exc.errors()
+                "data": jsonable_encoder(exc.errors())
             },
         )
 

@@ -1,5 +1,5 @@
 # app/schemas/user.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import Optional
 
 # Base user schema
@@ -21,6 +21,28 @@ class UserLogin(BaseModel):
 
 class UserForgotPassword(BaseModel):
     email: EmailStr
+
+class UserChangePassword(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_new_password: str
+
+    @validator('confirm_new_password')
+    def passwords_match(cls, v, values, **kwargs):
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
+
+class UserResetPassword(BaseModel):
+    reset_token: str
+    new_password: str
+    confirm_new_password: str
+
+    @validator('confirm_new_password')
+    def passwords_match(cls, v, values, **kwargs):
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
 
 class UserUpdate(BaseModel):
     fullname: Optional[str] = None

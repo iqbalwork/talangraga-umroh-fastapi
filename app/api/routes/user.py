@@ -1,14 +1,14 @@
 # app/api/routes/user.py
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Union
 from typing import Optional
 
 from app.db.session import get_db
 from app.db.models.user import User
-from app.schemas.user import UserResponse, BaseResponse, UserUpdate
+from app.schemas.user import UserResponse, BaseResponse, UserUpdate, UserChangePassword
 from app.api.routes.auth import get_current_user
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.utils.cloudinary import upload_image
 
 
@@ -65,7 +65,14 @@ def get_user_by_id(
 @router.put("/{user_id}", response_model=BaseResponse)
 def update_user(
     user_id: int,
-    request: UserUpdate,
+    fullname: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    user_type: Optional[str] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    image_profile: Union[UploadFile, str, None] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -83,19 +90,39 @@ def update_user(
 
     # Restrict sensitive fields for non-admin
     if current_user.user_type != "admin":
-        request.user_type = None
-        request.username = None
-        request.email = None
+        user_type = None
+        username = None
+        email = None
 
-    # Apply updates
-    update_data = request.model_dump(exclude_unset=True)
+    # Apply updates checking for empty values
+    if fullname and fullname.strip():
+        user.fullname = fullname
+    if username and username.strip():
+        # Check if username exists (if changed)
+        if user.username != username:
+            existing_user = db.query(User).filter(User.username == username).first()
+            if existing_user:
+                 raise HTTPException(status_code=400, detail="Username already registered")
+        user.username = username
+    if email and email.strip():
+         # Check if email exists (if changed)
+        if user.email != email:
+            existing_user = db.query(User).filter(User.email == email).first()
+            if existing_user:
+                 raise HTTPException(status_code=400, detail="Email already registered")
+        user.email = email
+    if user_type and user_type.strip():
+        user.user_type = user_type
+    if phone_number and phone_number.strip():
+        user.phone_number = phone_number
+    if domisili and domisili.strip():
+        user.domisili = domisili
+    if password and password.strip():
+        user.password = hash_password(password)
 
-    if "password" in update_data and update_data["password"]:
-        user.password = hash_password(update_data["password"])
-        del update_data["password"]
-
-    for field, value in update_data.items():
-        setattr(user, field, value)
+    if isinstance(image_profile, UploadFile) and image_profile.filename:
+        image_url = upload_image(image_profile)
+        user.image_profile_url = image_url
 
     db.commit()
     db.refresh(user)
@@ -111,25 +138,39 @@ def update_user(
 @router.put("/me/update", response_model=BaseResponse)
 def update_own_profile(
     fullname: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
     phone_number: Optional[str] = Form(None),
     domisili: Optional[str] = Form(None),
     password: Optional[str] = Form(None),
-    image_profile: Optional[UploadFile] = File(None),
+    image_profile: Union[UploadFile, str, None] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     user = current_user
 
-    if fullname:
+    if fullname and fullname.strip():
         user.fullname = fullname
-    if phone_number:
+    if username and username.strip():
+        if user.username != username:
+             existing_user = db.query(User).filter(User.username == username).first()
+             if existing_user:
+                 raise HTTPException(status_code=400, detail="Username already registered")
+        user.username = username
+    if email and email.strip():
+        if user.email != email:
+             existing_user = db.query(User).filter(User.email == email).first()
+             if existing_user:
+                 raise HTTPException(status_code=400, detail="Email already registered")
+        user.email = email
+    if phone_number and phone_number.strip():
         user.phone_number = phone_number
-    if domisili:
+    if domisili and domisili.strip():
         user.domisili = domisili
-    if password:
+    if password and password.strip():
         user.password = hash_password(password)
     
-    if image_profile:
+    if isinstance(image_profile, UploadFile) and image_profile.filename:
         image_url = upload_image(image_profile)
         user.image_profile_url = image_url
 
@@ -160,4 +201,27 @@ def delete_user(
     db.delete(user)
     db.commit()
 
+
     return BaseResponse(code=200, message="User deleted successfully", data=None)
+
+
+# 🔒 CHANGE PASSWORD
+@router.post("/me/change-password", response_model=BaseResponse)
+def change_password(
+    password_data: UserChangePassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password):
+        raise HTTPException(status_code=400, detail="Password saat ini salah")
+    
+    # Update password
+    current_user.password = hash_password(password_data.new_password)
+    db.commit()
+    
+    return BaseResponse(
+        code=200,
+        message="Password berhasil diubah",
+        data=None
+    )
