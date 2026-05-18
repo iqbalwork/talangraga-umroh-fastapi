@@ -16,6 +16,13 @@ from app.db.models import user, payment, periode, transaction  # import all mode
 # access to the values within the .ini file in use.
 config = context.config
 
+# Dynamically override the database URL from the environment (e.g. on Render)
+db_url = os.environ.get("DATABASE_URL")
+if db_url:
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    config.set_main_option("sqlalchemy.url", db_url)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
