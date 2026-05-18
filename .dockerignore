@@ -10,7 +10,6 @@ __pycache__/
 .gitignore
 .vscode
 .idea
-alembic.ini
 migrations/
 dist/
 build/

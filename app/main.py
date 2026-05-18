@@ -7,6 +7,8 @@ from app.db.base import Base
 from app.db.session import engine
 from fastapi.openapi.utils import get_openapi
 from app.core.exception_handler import init_exception_handlers
+from fastapi.staticfiles import StaticFiles
+import os
 
 Base.metadata.create_all(bind=engine)
 
@@ -14,6 +16,10 @@ app = FastAPI(title=settings.APP_NAME)
 
 # ✅ Register global exception handlers
 init_exception_handlers(app)
+
+# ✅ Mount static files (for uploads)
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,
