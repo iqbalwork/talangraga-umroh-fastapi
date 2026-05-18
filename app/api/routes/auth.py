@@ -1,10 +1,12 @@
 # app/api/routes/auth.py
 from datetime import timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt, JWTError
 from sqlalchemy.orm import Session
+import os
+import shutil
 
 from app.db.session import get_db
 from app.db.models.user import User
@@ -88,21 +90,45 @@ def get_user_profile(current_user: User = Depends(get_current_user)):
 # REGISTER
 # ----------------------------------------------------------
 @router.post("/register", response_model=BaseResponse)
-def register_user(request: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == request.email).first():
+def register_user(
+    fullname: str = Form(...),
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    user_type: Optional[str] = Form("member"),
+    file: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+):
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
-    if db.query(User).filter(User.username == request.username).first():
+    if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="Username already taken")
 
+    image_profile_url = None
+
+    if file:
+        upload_dir = "static/uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        timestamp = int(datetime.utcnow().timestamp())
+        safe_filename = file.filename or f"profile_{username}_{timestamp}.jpg"
+        file_path = os.path.join(upload_dir, safe_filename)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        image_profile_url = f"/static/uploads/{safe_filename}"
+
     new_user = User(
-        fullname=request.fullname,
-        username=request.username,
-        email=request.email,
-        password=hash_password(request.password),
-        phone_number=request.phone_number,
-        domisili=request.domisili,
-        user_type=request.user_type,
-        image_profile_url=request.image_profile_url,
+        fullname=fullname,
+        username=username,
+        email=email,
+        password=hash_password(password),
+        phone_number=phone_number,
+        domisili=domisili,
+        user_type=user_type,
+        image_profile_url=image_profile_url,
     )
     db.add(new_user)
     db.commit()

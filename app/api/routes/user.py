@@ -1,14 +1,16 @@
 # app/api/routes/user.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Form, File, UploadFile
 from sqlalchemy.orm import Session
-from typing import List
-from typing import Optional
+from typing import List, Optional
+from datetime import datetime
+import os
+import shutil
 
 from app.db.session import get_db
 from app.db.models.user import User
-from app.schemas.user import UserResponse, BaseResponse, UserUpdate
+from app.schemas.user import UserResponse, BaseResponse
 from app.api.routes.auth import get_current_user
-
+from app.core.security import hash_password
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -59,11 +61,19 @@ def get_user_by_id(
         data=UserResponse.from_orm(user)
     )
 
-# ✏️ UPDATE USER (Admin OR Self)
+
+# ✏️ UPDATE USER (Admin OR Self) (Form Data & File Upload)
 @router.put("/{user_id}", response_model=BaseResponse)
 def update_user(
     user_id: int,
-    request: UserUpdate,
+    fullname: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    email: Optional[str] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    user_type: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -81,19 +91,46 @@ def update_user(
 
     # Restrict sensitive fields for non-admin
     if current_user.user_type != "admin":
-        request.user_type = None
-        request.username = None
-        request.email = None
+        user_type = None
+        username = None
+        email = None
 
-    # Apply updates
-    update_data = request.model_dump(exclude_unset=True)
+    # Handle image upload if provided
+    if file:
+        upload_dir = "static/uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        timestamp = int(datetime.utcnow().timestamp())
+        safe_filename = file.filename or f"profile_{user.username or user_id}_{timestamp}.jpg"
+        file_path = os.path.join(upload_dir, safe_filename)
 
-    if "password" in update_data and update_data["password"]:
-        user.password = hash_password(update_data["password"])
-        del update_data["password"]
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-    for field, value in update_data.items():
-        setattr(user, field, value)
+        user.image_profile_url = f"/static/uploads/{safe_filename}"
+
+    # Apply other updates
+    if fullname is not None:
+        user.fullname = fullname
+    if username is not None:
+        # Check uniqueness if username is changing
+        if username != user.username:
+            if db.query(User).filter(User.username == username).first():
+                raise HTTPException(status_code=400, detail="Username already taken")
+            user.username = username
+    if email is not None:
+        # Check uniqueness if email is changing
+        if email != user.email:
+            if db.query(User).filter(User.email == email).first():
+                raise HTTPException(status_code=400, detail="Email already registered")
+            user.email = email
+    if phone_number is not None:
+        user.phone_number = phone_number
+    if domisili is not None:
+        user.domisili = domisili
+    if user_type is not None:
+        user.user_type = user_type
+    if password is not None and password != "":
+        user.password = hash_password(password)
 
     db.commit()
     db.refresh(user)
@@ -105,34 +142,40 @@ def update_user(
     )
 
 
-# 🟢 UPDATE OWN PROFILE
+# 🟢 UPDATE OWN PROFILE (Form Data & File Upload)
 @router.put("/me/update", response_model=BaseResponse)
 def update_own_profile(
-    request: UserUpdate,
+    fullname: Optional[str] = Form(None),
+    phone_number: Optional[str] = Form(None),
+    domisili: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # Restrict update of sensitive fields
-    forbidden_fields = ["user_type", "email", "username"]
-    for field in forbidden_fields:
-        if getattr(request, field):
-            raise HTTPException(
-                status_code=400,
-                detail=f"You are not allowed to update '{field}'"
-            )
-
     user = current_user  # direct reference
 
-    if request.fullname:
-        user.fullname = request.fullname
-    if request.phone_number:
-        user.phone_number = request.phone_number
-    if request.domisili:
-        user.domisili = request.domisili
-    if request.image_profile_url:
-        user.image_profile_url = request.image_profile_url
-    if request.password:
-        user.password = hash_password(request.password)
+    # Handle image upload if provided
+    if file:
+        upload_dir = "static/uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        timestamp = int(datetime.utcnow().timestamp())
+        safe_filename = file.filename or f"profile_{user.username}_{timestamp}.jpg"
+        file_path = os.path.join(upload_dir, safe_filename)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        user.image_profile_url = f"/static/uploads/{safe_filename}"
+
+    if fullname is not None:
+        user.fullname = fullname
+    if phone_number is not None:
+        user.phone_number = phone_number
+    if domisili is not None:
+        user.domisili = domisili
+    if password is not None and password != "":
+        user.password = hash_password(password)
 
     db.commit()
     db.refresh(user)
