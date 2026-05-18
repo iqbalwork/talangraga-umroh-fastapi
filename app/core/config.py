@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 class Settings(BaseSettings):
     APP_NAME: str = "Talangraga Backend"
@@ -17,6 +18,13 @@ class Settings(BaseSettings):
     CLOUDINARY_API_KEY: str
     CLOUDINARY_API_SECRET: str
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_db_connection(cls, v: str) -> str:
+        if isinstance(v, str) and v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+psycopg2://", 1)
+        return v
+
     model_config = {
         "env_file": ".env",
         "extra": "ignore",
@@ -24,3 +32,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
