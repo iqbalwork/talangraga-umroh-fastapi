@@ -1,5 +1,6 @@
 # app/api/routes/user.py
 from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.orm import Session
 from typing import List, Union
 from typing import Optional
@@ -120,7 +121,7 @@ def update_user(
     if password and password.strip():
         user.password = hash_password(password)
 
-    if isinstance(image_profile, UploadFile) and image_profile.filename:
+    if isinstance(image_profile, (UploadFile, StarletteUploadFile)) and image_profile.filename:
         image_url = upload_image(image_profile)
         user.image_profile_url = image_url
 
@@ -170,7 +171,7 @@ def update_own_profile(
     if password and password.strip():
         user.password = hash_password(password)
     
-    if isinstance(image_profile, UploadFile) and image_profile.filename:
+    if isinstance(image_profile, (UploadFile, StarletteUploadFile)) and image_profile.filename:
         image_url = upload_image(image_profile)
         user.image_profile_url = image_url
 
