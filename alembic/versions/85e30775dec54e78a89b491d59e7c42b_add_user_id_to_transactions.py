@@ -17,19 +17,66 @@ depends_on = None
 
 
 def upgrade():
-    # 1. Add column as nullable first to allow adding to existing rows
-    op.add_column('transactions', sa.Column('user_id', sa.Integer(), nullable=True))
-    
-    # 2. Populate existing rows (copy reported_by_id to user_id as a default for existing data)
-    op.execute("UPDATE transactions SET user_id = reported_by_id")
-    
-    # 3. Alter column to be not null
-    op.alter_column('transactions', 'user_id', nullable=False, existing_type=sa.Integer())
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
 
-    # 4. Create foreign key
-    op.create_foreign_key(None, 'transactions', 'users', ['user_id'], ['id'])
+    if not inspector.has_table("transactions"):
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("transactions")}
+
+    if "user_id" not in column_names:
+        op.add_column("transactions", sa.Column("user_id", sa.Integer(), nullable=True))
+        inspector = sa.inspect(bind)
+        column_names = {column["name"] for column in inspector.get_columns("transactions")}
+
+    if "user_id" in column_names and "reported_by_id" in column_names:
+        op.execute("UPDATE transactions SET user_id = reported_by_id WHERE user_id IS NULL")
+
+    if "user_id" in column_names:
+        null_user_count = bind.execute(
+            sa.text("SELECT COUNT(*) FROM transactions WHERE user_id IS NULL")
+        ).scalar_one()
+        if null_user_count == 0:
+            op.alter_column(
+                "transactions",
+                "user_id",
+                nullable=False,
+                existing_type=sa.Integer(),
+            )
+
+    fk_exists = any(
+        fk.get("referred_table") == "users"
+        and fk.get("constrained_columns") == ["user_id"]
+        for fk in inspector.get_foreign_keys("transactions")
+    )
+    if inspector.has_table("users") and "user_id" in column_names and not fk_exists:
+        op.create_foreign_key(
+            "fk_transactions_user_id_users",
+            "transactions",
+            "users",
+            ["user_id"],
+            ["id"],
+        )
 
 
 def downgrade():
-    op.drop_constraint(None, 'transactions', type_='foreignkey')
-    op.drop_column('transactions', 'user_id')
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    if not inspector.has_table("transactions"):
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("transactions")}
+    if "user_id" not in column_names:
+        return
+
+    for fk in inspector.get_foreign_keys("transactions"):
+        if (
+            fk.get("referred_table") == "users"
+            and fk.get("constrained_columns") == ["user_id"]
+            and fk.get("name")
+        ):
+            op.drop_constraint(fk["name"], "transactions", type_="foreignkey")
+
+    op.drop_column("transactions", "user_id")
